@@ -1,0 +1,2113 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Almoxarifado da Saúde - Gestão Pública Municipal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        health: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            800: '#0c4a6e',
+                            900: '#0f172a'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white !important; color: black !important; padding: 0 !important; }
+            .page-break { page-break-after: always; }
+        }
+        .print-only { display: none; }
+        /* Custom scrollbar for modern subtle appearance */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="h-full text-slate-800 antialiased selection:bg-sky-100 selection:text-sky-900">
+    <div id="root" class="h-full"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // INITIAL DATABASE SEED DATA
+        const SEED_USERS = [
+            { id: 'u1', login: 'maria.administradora', nome: 'maria', cargo: 'administradora', descCargo: 'Administradora do Sistema', role: 'ADMIN', senhaHash: 'demo123', status: 'Ativo' },
+            { id: 'u2', login: 'eva.coordenadora', nome: 'eva', cargo: 'coordenadora', descCargo: 'Coordenadora do Almoxarifado', role: 'COORDENADORA', senhaHash: 'demo123', status: 'Ativo' },
+            { id: 'u3', login: 'joana.organizacao', nome: 'joana', cargo: 'organizacao', descCargo: 'Responsável pela Organização', role: 'ORGANIZACAO', senhaHash: 'demo123', status: 'Ativo' },
+            { id: 'u4', login: 'ana.pedidos', nome: 'ana', cargo: 'pedidos', descCargo: 'Responsável pela Análise de Pedidos', role: 'ANALISTA_PEDIDOS', senhaHash: 'demo123', status: 'Ativo' }
+        ];
+
+        const SEED_HEALTH_UNITS = [
+            { id: 'hu1', codigo: 'UBS-001', nome: 'UBS Central', responsavel: 'Dra. Carla Mendes', endereco: 'Av. Brasil, 500 - Centro', status: 'Ativo' },
+            { id: 'hu2', codigo: 'UBS-002', nome: 'UBS Norte', responsavel: 'Enf. Roberto Lima', endereco: 'Rua das Flores, 120 - Bairro Norte', status: 'Ativo' },
+            { id: 'hu3', codigo: 'UBS-003', nome: 'UBS Sul', responsavel: 'Dra. Juliana Prado', endereco: 'Av. Sul, 890 - Bairro Sul', status: 'Ativo' },
+            { id: 'hu4', codigo: 'UBS-004', nome: 'UBS Leste', responsavel: 'Enf. Marcos Vinícius', endereco: 'Rua do Sol, 45 - Leste', status: 'Ativo' },
+            { id: 'hu5', codigo: 'UPA-001', nome: 'UPA 24h Central', responsavel: 'Dr. Fernando Dias', endereco: 'Av. Circunvalação, 1000', status: 'Ativo' }
+        ];
+
+        const SEED_CATEGORIES = ['Medicamentos Gerais', 'Insumos / Correlatos', 'EPIs e Proteção', 'Injetáveis', 'Curativos'];
+
+        const SEED_PRODUCTS = [
+            { id: 'p1', codigo: 'MED-1001', nome: 'Dipirona Sódica 500mg/ml Injetável', categoria: 'Medicamentos Gerais', unidadeMedida: 'Ampola', estoqueMinimo: 500, localizacao: 'Aisle A-01' },
+            { id: 'p2', codigo: 'MED-1002', nome: 'Amoxicilina 500mg Cápsula', categoria: 'Medicamentos Gerais', unidadeMedida: 'Caixa c/ 30', estoqueMinimo: 200, localizacao: 'Aisle A-03' },
+            { id: 'p3', codigo: 'EPI-2001', nome: 'Luva de Procedimento Nitrílica M', categoria: 'EPIs e Proteção', unidadeMedida: 'Caixa c/ 100', estoqueMinimo: 300, localizacao: 'Aisle B-02' },
+            { id: 'p4', codigo: 'EPI-2002', nome: 'Luva de Procedimento Nitrílica P', categoria: 'EPIs e Proteção', unidadeMedida: 'Caixa c/ 100', estoqueMinimo: 200, localizacao: 'Aisle B-01' },
+            { id: 'p5', codigo: 'INS-3001', nome: 'Soro Fisiológico 0,9% 500ml', categoria: 'Insumos / Correlatos', unidadeMedida: 'Frasco', estoqueMinimo: 400, localizacao: 'Aisle C-05' },
+            { id: 'p6', codigo: 'INS-3002', nome: 'Seringa Descartável 5ml c/ Agulha', categoria: 'Injetáveis', unidadeMedida: 'Caixa c/ 100', estoqueMinimo: 150, localizacao: 'Aisle C-02' },
+            { id: 'p7', codigo: 'MED-1003', nome: 'Paracetamol 500mg Comprimido', categoria: 'Medicamentos Gerais', unidadeMedida: 'Caixa c/ 20', estoqueMinimo: 300, localizacao: 'Aisle A-02' },
+            { id: 'p8', codigo: 'CUR-4001', nome: 'Atadura de Crepe 10cm x 4,5m', categoria: 'Curativos', unidadeMedida: 'Pacote c/ 12', estoqueMinimo: 100, localizacao: 'Aisle D-01' }
+        ];
+
+        const SEED_LOTES = [
+            { id: 'l1', produtoId: 'p1', lote: 'LOTE-2026-A', validade: '2026-10-15', quantidade: 1200, fornecedor: 'Eurofarma Laboratórios' },
+            { id: 'l2', produtoId: 'p1', lote: 'LOTE-2026-B', validade: '2027-04-20', quantidade: 850, fornecedor: 'Eurofarma Laboratórios' },
+            { id: 'l3', produtoId: 'p2', lote: 'AMX-9081', validade: '2026-11-30', quantidade: 140, fornecedor: 'Medley Farmacêutica' }, // Estoque baixo
+            { id: 'l4', produtoId: 'p3', lote: 'NIT-2201', validade: '2028-01-10', quantidade: 650, fornecedor: 'Descarpack' },
+            { id: 'l5', produtoId: 'p4', lote: 'NIT-1105', validade: '2026-09-30', quantidade: 80, fornecedor: 'Descarpack' }, // Próximo vencimento / estoque baixo
+            { id: 'l6', produtoId: 'p5', lote: 'SF-88391', validade: '2026-09-18', quantidade: 120, fornecedor: 'JP Farma' }, // Próximo vencimento
+            { id: 'l7', produtoId: 'p5', lote: 'SF-99120', validade: '2027-08-15', quantidade: 800, fornecedor: 'JP Farma' },
+            { id: 'l8', produtoId: 'p6', lote: 'SER-4412', validade: '2028-05-12', quantidade: 400, fornecedor: 'BD Medical' },
+            { id: 'l9', produtoId: 'p7', lote: 'PAR-1011', validade: '2025-12-01', quantidade: 15, fornecedor: 'Prati-Donaduzzi' }, // Vencido
+            { id: 'l10', produtoId: 'p8', lote: 'ATD-3300', validade: '2027-11-01', quantidade: 250, fornecedor: 'Cremer' }
+        ];
+
+        const SEED_ORDERS = [
+            {
+                id: 'ORD-2026-001',
+                unidadeId: 'hu2',
+                unidadeNome: 'UBS Norte',
+                dataCriacao: '2026-09-05T09:15:00',
+                solicitante: 'Enf. Roberto Lima',
+                status: 'em_analise', // rascunho, enviado, em_analise, aprovado, parcialmente_aprovado, pronto_separacao, separado, finalizado, negado
+                observacao: 'Pedido mensal regular de reposição da UBS Norte.',
+                itens: [
+                    { produtoId: 'p4', produtoNome: 'Luva de Procedimento Nitrílica P', solicitado: 50, aprovado: 30, negado: 20, motivo: 'Estoque disponível limitado' },
+                    { produtoId: 'p1', produtoNome: 'Dipirona Sódica 500mg/ml Injetável', solicitado: 200, aprovado: 200, negado: 0, motivo: '' },
+                    { produtoId: 'p5', produtoNome: 'Soro Fisiológico 0,9% 500ml', solicitado: 100, aprovado: 100, negado: 0, motivo: '' }
+                ]
+            },
+            {
+                id: 'ORD-2026-002',
+                unidadeId: 'hu1',
+                unidadeNome: 'UBS Central',
+                dataCriacao: '2026-09-06T14:30:00',
+                solicitante: 'Dra. Carla Mendes',
+                status: 'pronto_separacao',
+                observacao: 'Urgência para atendimento do final de semana.',
+                itens: [
+                    { produtoId: 'p2', produtoNome: 'Amoxicilina 500mg Cápsula', solicitado: 50, aprovado: 50, negado: 0, motivo: '' },
+                    { produtoId: 'p3', produtoNome: 'Luva de Procedimento Nitrílica M', solicitado: 80, aprovado: 80, negado: 0, motivo: '' }
+                ]
+            },
+            {
+                id: 'ORD-2026-003',
+                unidadeId: 'hu5',
+                unidadeNome: 'UPA 24h Central',
+                dataCriacao: '2026-09-07T11:00:00',
+                solicitante: 'Dr. Fernando Dias',
+                status: 'enviado',
+                observacao: 'Reposição quinzenal UPA.',
+                itens: [
+                    { produtoId: 'p1', produtoNome: 'Dipirona Sódica 500mg/ml Injetável', solicitado: 400, aprovado: null, negado: null, motivo: '' },
+                    { produtoId: 'p6', produtoNome: 'Seringa Descartável 5ml c/ Agulha', solicitado: 100, aprovado: null, negado: null, motivo: '' }
+                ]
+            }
+        ];
+
+        const SEED_CYCLES = [
+            {
+                id: 'CYC-2026-02',
+                titulo: 'Contagem Quinzenal Setor A (Medicamentos)',
+                dataAbertura: '2026-08-28',
+                dataLimite: '2026-09-10',
+                responsavel: 'joana.organizacao',
+                status: 'ABERTO', // ABERTO, EM_ANALISE_COORDENACAO, CONCLUIDO, ATRASADO
+                observacao: 'Conferência física dos lotes de amoxicilina e soros.',
+                itens: [
+                    { produtoId: 'p5', produtoNome: 'Soro Fisiológico 0,9% 500ml', lote: 'SF-88391', qtdSistema: 100, qtdEncontrada: 84, diferenca: -16, validade: '2026-09-18', obs: '16 unidades com avaria na embalagem descartadas.' },
+                    { produtoId: 'p2', produtoNome: 'Amoxicilina 500mg Cápsula', lote: 'AMX-9081', qtdSistema: 140, qtdEncontrada: 140, diferenca: 0, validade: '2026-11-30', obs: 'Conferência OK' }
+                ]
+            }
+        ];
+
+        const SEED_ACTIVITIES = [
+            { id: 'act-101', usuario: 'maria', cargo: 'administradora', acao: 'Criou novo lote de estoque', produto: 'Dipirona Sódica 500mg/ml', quantidade: 850, unidade: 'Almoxarifado Central', data: '08/09/2026 às 09:12', status: 'Sucesso' },
+            { id: 'act-102', usuario: 'eva', cargo: 'coordenadora', acao: 'Aprovou pedido ORD-2026-002', produto: 'Diversos (2 itens)', quantidade: 130, unidade: 'UBS Central', data: '08/09/2026 às 09:30', status: 'Concluído' },
+            { id: 'act-103', usuario: 'joana', cargo: 'organizacao', acao: 'Registrou contagem física preliminar', produto: 'Soro Fisiológico 0,9%', quantidade: 84, unidade: 'Corredor C-05', data: '08/09/2026 às 09:42', status: 'Pendente Coordenação' },
+            { id: 'act-104', usuario: 'ana', cargo: 'pedidos', acao: 'Iniciou análise de pedido ORD-2026-001', produto: 'Luva Nitrílica P', quantidade: 50, unidade: 'UBS Norte', data: '08/09/2026 às 10:05', status: 'Em Análise' }
+        ];
+
+        const SEED_DONATIONS = [
+            { id: 'don-1', tipo: 'RECEBIDA', produtoNome: 'Atadura de Crepe 10cm', quantidade: 100, lote: 'DON-2026-9', validade: '2028-02-01', origemDestino: 'Rotary Club Municipal', data: '2026-09-01', documento: 'Termo Doação #442', responsavel: 'eva.coordenadora' },
+            { id: 'don-2', tipo: 'REALIZADA', produtoNome: 'Luva de Procedimento Nitrílica M', quantidade: 50, lote: 'NIT-2201', validade: '2028-01-10', origemDestino: 'Asilo São Vicente de Paulo', data: '2026-09-03', documento: 'Ofício SMS 112/2026', responsavel: 'eva.coordenadora' }
+        ];
+
+        function App() {
+            // Authentication & Session State
+            const [currentUser, setCurrentUser] = useState(null);
+            const [loginInput, setLoginInput] = useState('');
+            const [passwordInput, setPasswordInput] = useState('');
+            const [loginError, setLoginError] = useState('');
+
+            // App Global Data State
+            const [users, setUsers] = useState(SEED_USERS);
+            const [products, setProducts] = useState(SEED_PRODUCTS);
+            const [lotes, setLotes] = useState(SEED_LOTES);
+            const [healthUnits, setHealthUnits] = useState(SEED_HEALTH_UNITS);
+            const [orders, setOrders] = useState(SEED_ORDERS);
+            const [cycles, setCycles] = useState(SEED_CYCLES);
+            const [activities, setActivities] = useState(SEED_ACTIVITIES);
+            const [donations, setDonations] = useState(SEED_DONATIONS);
+
+            // System Configurations
+            const [directUpdateAllowed, setDirectUpdateAllowed] = useState(false); // Config para perfil organizacao alterar direto
+
+            // Navigation & UI States
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [globalSearch, setGlobalSearch] = useState('');
+            const [selectedOrderForPrint, setSelectedOrderForPrint] = useState(null);
+            const [selectedOrderForAnalysis, setSelectedOrderForAnalysis] = useState(null);
+            const [toast, setToast] = useState(null);
+            const [modal, setModal] = useState(null);
+
+            // Re-render Lucide icons whenever UI updates
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            });
+
+            // Toast helper
+            const showToast = (message, type = 'success') => {
+                setToast({ message, type });
+                setTimeout(() => setToast(null), 4000);
+            };
+
+            // Audit log generator
+            const logActivity = (acao, produto, quantidade, unidade, status = 'Concluído') => {
+                if (!currentUser) return;
+                const newAct = {
+                    id: 'act-' + Date.now(),
+                    usuario: currentUser.nome,
+                    cargo: currentUser.cargo,
+                    acao,
+                    produto: produto || '-',
+                    quantidade: quantidade || 0,
+                    unidade: unidade || 'Almoxarifado Central',
+                    data: new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                    status
+                };
+                setActivities(prev => [newAct, ...prev]);
+            };
+
+            // Helper FEFO stock calculator
+            const getProductStockSummary = useMemo(() => {
+                const map = {};
+                products.forEach(p => {
+                    const pLotes = lotes.filter(l => l.produtoId === p.id);
+                    const totalQtd = pLotes.reduce((acc, curr) => acc + curr.quantidade, 0);
+
+                    // Check expiration FEFO
+                    const today = new Date().toISOString().split('T')[0];
+                    const thirtyDays = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+                    let expiredCount = 0;
+                    let nearExpiryCount = 0;
+
+                    pLotes.forEach(l => {
+                        if (l.validade < today) expiredCount += l.quantidade;
+                        else if (l.validade <= thirtyDays) nearExpiryCount += l.quantidade;
+                    });
+
+                    let status = 'NORMAL';
+                    if (totalQtd === 0) status = 'EM_FALTA';
+                    else if (totalQtd < p.estoqueMinimo) status = 'ESTOQUE_BAIXO';
+
+                    map[p.id] = {
+                        totalQtd,
+                        status,
+                        expiredCount,
+                        nearExpiryCount,
+                        lotesCount: pLotes.length
+                    };
+                });
+                return map;
+            }, [products, lotes]);
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                setLoginError('');
+
+                const cleanLogin = loginInput.trim().toLowerCase();
+                const userFound = users.find(u => u.login === cleanLogin);
+
+                if (!userFound) {
+                    setLoginError('Login não encontrado. O formato deve ser nome.cargo (ex: eva.coordenadora)');
+                    return;
+                }
+
+                if (userFound.senhaHash !== passwordInput) {
+                    setLoginError('Senha incorreta para a conta informada.');
+                    return;
+                }
+
+                if (userFound.status !== 'Ativo') {
+                    setLoginError('Esta conta de usuário encontra-se desativada.');
+                    return;
+                }
+
+                setCurrentUser(userFound);
+                setActiveTab('dashboard');
+                showToast(`Bem-vinda(o), ${userFound.nome}! Sessão iniciada com sucesso.`);
+            };
+
+            const handleLogout = () => {
+                setCurrentUser(null);
+                setLoginInput('');
+                setPasswordInput('');
+                setLoginError('');
+            };
+
+            // Quick demo login preset helper
+            const fillDemoUser = (login) => {
+                setLoginInput(login);
+                setPasswordInput('demo123');
+                setLoginError('');
+            };
+
+            if (!currentUser) {
+                return (
+                    <div className="min-h-screen bg-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+                        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-sky-600 text-white shadow-lg mb-4">
+                                <i data-lucide="cross" className="w-10 h-10"></i>
+                            </div>
+                            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 uppercase">almoxarifado da saúde</h1>
+                            <p className="mt-1 text-sm text-slate-600 font-medium">Prefeitura Municipal & Secretaria de Saúde</p>
+                            <p className="mt-2 text-xs text-sky-700 font-semibold uppercase tracking-wider bg-sky-50 py-1 px-3 rounded-full inline-block border border-sky-200">
+                                Acesso Restrito ao Sistema
+                            </p>
+                        </div>
+
+                        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+                            <div className="bg-white py-8 px-6 shadow-xl rounded-2xl border border-slate-200/80 sm:px-10">
+                                <form className="space-y-6" onSubmit={handleLogin}>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                            login <span className="text-slate-400 font-normal">(formato nome.cargo)</span>
+                                        </label>
+                                        <div className="mt-2 relative">
+                                            <input
+                                                type="text"
+                                                required
+                                                value={loginInput}
+                                                onChange={(e) => setLoginInput(e.target.value)}
+                                                placeholder="eva.coordenadora"
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-sm font-mono transition"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                                            senha
+                                        </label>
+                                        <div className="mt-2">
+                                            <input
+                                                type="password"
+                                                required
+                                                value={passwordInput}
+                                                onChange={(e) => setPasswordInput(e.target.value)}
+                                                placeholder="••••••••••••"
+                                                className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-sm transition"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {loginError && (
+                                        <div className="rounded-xl bg-red-50 p-3 border border-red-200">
+                                            <div className="flex items-start">
+                                                <i data-lucide="alert-circle" className="w-5 h-5 text-red-600 mr-2 mt-0.5"></i>
+                                                <p className="text-xs font-medium text-red-800">{loginError}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <button
+                                            type="submit"
+                                            className="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-md text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition"
+                                        >
+                                            Entrar
+                                        </button>
+                                    </div>
+
+                                    <div className="text-center">
+                                        <a href="#" onClick={(e) => { e.preventDefault(); alert('Solicitação de redefinição de senha enviada ao Administrador.'); }} className="text-xs font-medium text-sky-600 hover:text-sky-800">
+                                            esqueci minha senha
+                                        </a>
+                                    </div>
+                                </form>
+
+                                {/* Quick Selector for Demo Evaluation */}
+                                <div className="mt-8 pt-6 border-t border-slate-200">
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider text-center mb-3">
+                                        Contas de Demonstração (Clique para preencher)
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <button
+                                            type="button"
+                                            onClick={() => fillDemoUser('eva.coordenadora')}
+                                            className="p-2 rounded-lg bg-slate-50 hover:bg-sky-50 border border-slate-200 text-left transition"
+                                        >
+                                            <span className="font-bold block text-slate-800">eva.coordenadora</span>
+                                            <span className="text-[10px] text-slate-500">Coordenadora</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => fillDemoUser('maria.administradora')}
+                                            className="p-2 rounded-lg bg-slate-50 hover:bg-sky-50 border border-slate-200 text-left transition"
+                                        >
+                                            <span className="font-bold block text-slate-800">maria.administradora</span>
+                                            <span className="text-[10px] text-slate-500">Administradora</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => fillDemoUser('joana.organizacao')}
+                                            className="p-2 rounded-lg bg-slate-50 hover:bg-sky-50 border border-slate-200 text-left transition"
+                                        >
+                                            <span className="font-bold block text-slate-800">joana.organizacao</span>
+                                            <span className="text-[10px] text-slate-500">Organização</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => fillDemoUser('ana.pedidos')}
+                                            className="p-2 rounded-lg bg-slate-50 hover:bg-sky-50 border border-slate-200 text-left transition"
+                                        >
+                                            <span className="font-bold block text-slate-800">ana.pedidos</span>
+                                            <span className="text-[10px] text-slate-500">Análise Pedidos</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-slate-100 flex flex-col">
+                    {/* Toast Alert Floating Banner */}
+                    {toast && (
+                        <div className="fixed top-4 right-4 z-50 flex items-center p-4 mb-4 text-slate-800 rounded-xl shadow-xl bg-white border-l-4 border-sky-500 animate-bounce">
+                            <i data-lucide="check-circle" className="w-5 h-5 text-sky-600 mr-3"></i>
+                            <div className="text-sm font-medium">{toast.message}</div>
+                        </div>
+                    )}
+
+                    {/* TOP NAVIGATION BAR */}
+                    <header className="bg-white border-b border-slate-200 sticky top-0 z-30 no-print">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="flex justify-between h-16 items-center">
+                                {/* Brand Logo & Public System Identifier */}
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center font-bold shadow-sm">
+                                        <i data-lucide="activity" className="w-6 h-6"></i>
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-slate-900 uppercase tracking-tight">almoxarifado da saúde</div>
+                                        <div className="text-[11px] text-slate-500 font-medium">Secretaria Municipal de Saúde</div>
+                                    </div>
+                                </div>
+
+                                {/* Global Search Input Bar */}
+                                <div className="hidden md:flex flex-1 max-w-xs mx-8">
+                                    <div className="relative w-full">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i data-lucide="search" className="w-4 h-4 text-slate-400"></i>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={globalSearch}
+                                            onChange={(e) => setGlobalSearch(e.target.value)}
+                                            placeholder="Buscar produtos, lotes, pedidos..."
+                                            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-100 border border-transparent rounded-lg focus:bg-white focus:border-sky-500 focus:outline-none transition"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Personalized Greeting & User Profile Badge */}
+                                <div className="flex items-center space-x-4">
+                                    <div className="text-right">
+                                        <div className="text-sm font-bold text-slate-800 capitalize">
+                                            olá, {currentUser.nome}
+                                        </div>
+                                        <div className="text-xs text-slate-500 font-medium">
+                                            {currentUser.descCargo}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleLogout}
+                                        title="Encerrar Sessão"
+                                        className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
+                                    >
+                                        <i data-lucide="log-out" className="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* SUB NAV MODULE TABS */}
+                        <div className="bg-slate-50/80 border-t border-slate-200/60 px-4 sm:px-6 lg:px-8">
+                            <div className="max-w-7xl mx-auto flex space-x-1 overflow-x-auto py-2 text-xs font-semibold">
+                                <button
+                                    onClick={() => setActiveTab('dashboard')}
+                                    className={`px-3 py-2 rounded-lg flex items-center space-x-2 transition ${activeTab === 'dashboard' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/60'}`}
+                                >
+                                    <i data-lucide="layout-dashboard" className="w-4 h-4"></i>
+                                    <span>Painel Principal</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab('estoque')}
+                                    className={`px-3 py-2 rounded-lg flex items-center space-x-2 transition ${activeTab === 'estoque' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/60'}`}
+                                >
+                                    <i data-lucide="package" className="w-4 h-4"></i>
+                                    <span>Estoque & Lotes</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab('entradas')}
+                                    className={`px-3 py-2 rounded-lg flex items-center space-x-2 transition ${activeTab === 'entradas' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/60'}`}
+                                >
+                                    <i data-lucide="arrow-down-left" className="w-4 h-4"></i>
+                                    <span>Entradas & Divergências</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab('pedidos')}
+                                    className={`px-3 py-2 rounded-lg flex items-center space-x-2 transition ${activeTab === 'pedidos' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/60'}`}
+                                >
+                                    <i data-lucide="shopping-bag" className="w-4 h-4"></i>
+                                    <span>Análise de Pedidos</span>
+                                    {orders.filter(o => o.status === 'enviado' || o.status === 'em_analise').length > 0 && (
+                                        <span className="ml-1 bg-amber-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                                            {orders.filter(o => o.status === 'enviado' || o.status === 'em_analise').length}
+                                        </span>
+                                    )}
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab('atualizacoes')}
+                                    className={`px-3 py-2 rounded-lg flex items-center space-x-2 transition ${activeTab === 'atualizacoes' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/60'}`}
+                                >
+                                    <i data-lucide="clipboard-check" className="w-4 h-4"></i>
+                                    <span>Atualização do Almoxarifado</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab('doacoes')}
+                                    className={`px-3 py-2 rounded-lg flex items-center space-x-2 transition ${activeTab === 'doacoes' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/60'}`}
+                                >
+                                    <i data-lucide="heart-handshake" className="w-4 h-4"></i>
+                                    <span>Doações</span>
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveTab('atividades')}
+                                    className={`px-3 py-2 rounded-lg flex items-center space-x-2 transition ${activeTab === 'atividades' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/60'}`}
+                                >
+                                    <i data-lucide="shield-check" className="w-4 h-4"></i>
+                                    <span>Central de Atividades</span>
+                                </button>
+
+                                {currentUser.role === 'ADMIN' && (
+                                    <button
+                                        onClick={() => setActiveTab('usuarios')}
+                                        className={`px-3 py-2 rounded-lg flex items-center space-x-2 transition ${activeTab === 'usuarios' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/60'}`}
+                                    >
+                                        <i data-lucide="users" className="w-4 h-4"></i>
+                                        <span>Usuários & Permissões</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* MAIN CONTENT AREA CONTAINER */}
+                    <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 no-print">
+                        
+                        {/* TAB 1: DASHBOARD (ADAPTIVE PER USER ROLE) */}
+                        {activeTab === 'dashboard' && (
+                            <DashboardView
+                                currentUser={currentUser}
+                                products={products}
+                                lotes={lotes}
+                                orders={orders}
+                                cycles={cycles}
+                                activities={activities}
+                                getProductStockSummary={getProductStockSummary}
+                                setActiveTab={setActiveTab}
+                            />
+                        )}
+
+                        {/* TAB 2: ESTOQUE & LOTES (FEFO PRIORITY) */}
+                        {activeTab === 'estoque' && (
+                            <StockLotesView
+                                products={products}
+                                lotes={lotes}
+                                setLotes={setLotes}
+                                getProductStockSummary={getProductStockSummary}
+                                currentUser={currentUser}
+                                logActivity={logActivity}
+                                showToast={showToast}
+                            />
+                        )}
+
+                        {/* TAB 3: ENTRADAS & DIVERGÊNCIAS DE NOTAS */}
+                        {activeTab === 'entradas' && (
+                            <InboundReceivingView
+                                products={products}
+                                lotes={lotes}
+                                setLotes={setLotes}
+                                currentUser={currentUser}
+                                logActivity={logActivity}
+                                showToast={showToast}
+                            />
+                        )}
+
+                        {/* TAB 4: PEDIDOS & ANÁLISE DAS UNIDADES */}
+                        {activeTab === 'pedidos' && (
+                            <OrdersAnalysisView
+                                orders={orders}
+                                setOrders={setOrders}
+                                products={products}
+                                lotes={lotes}
+                                getProductStockSummary={getProductStockSummary}
+                                currentUser={currentUser}
+                                setSelectedOrderForPrint={setSelectedOrderForPrint}
+                                logActivity={logActivity}
+                                showToast={showToast}
+                            />
+                        )}
+
+                        {/* TAB 5: ATUALIZAÇÃO DO ALMOXARIFADO (CICLOS DE CONTAGEM FISICA) */}
+                        {activeTab === 'atualizacoes' && (
+                            <InventoryCyclesView
+                                cycles={cycles}
+                                setCycles={setCycles}
+                                products={products}
+                                lotes={lotes}
+                                setLotes={setLotes}
+                                currentUser={currentUser}
+                                directUpdateAllowed={directUpdateAllowed}
+                                setDirectUpdateAllowed={setDirectUpdateAllowed}
+                                logActivity={logActivity}
+                                showToast={showToast}
+                            />
+                        )}
+
+                        {/* TAB 6: DOAÇÕES RECEBIDAS E REALIZADAS */}
+                        {activeTab === 'doacoes' && (
+                            <DonationsView
+                                donations={donations}
+                                setDonations={setDonations}
+                                products={products}
+                                lotes={lotes}
+                                setLotes={setLotes}
+                                currentUser={currentUser}
+                                logActivity={logActivity}
+                                showToast={showToast}
+                            />
+                        )}
+
+                        {/* TAB 7: CENTRAL DE ATIVIDADES & AUDITORIA */}
+                        {activeTab === 'atividades' && (
+                            <ActivityLogView activities={activities} />
+                        )}
+
+                        {/* TAB 8: GESTÃO DE USUÁRIOS (ADMIN ONLY) */}
+                        {activeTab === 'usuarios' && currentUser.role === 'ADMIN' && (
+                            <UserManagementView
+                                users={users}
+                                setUsers={setUsers}
+                                showToast={showToast}
+                            />
+                        )}
+                    </main>
+
+                    {/* PRINT VIEW TEMPLATE (ONLY VISIBLE ON PRINTING A4) */}
+                    {selectedOrderForPrint && (
+                        <PrintableOrderSlip order={selectedOrderForPrint} />
+                    )}
+
+                    {/* FOOTER */}
+                    <footer className="bg-white border-t border-slate-200 mt-auto py-4 px-6 text-center text-xs text-slate-500 no-print">
+                        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
+                            <div>
+                                <span className="font-bold text-slate-700">Almoxarifado da Saúde</span> — Sistema de Gestão Pública Digital & Rastreável
+                            </div>
+                            <div>
+                                Sessão Ativa: <span className="font-mono font-semibold text-slate-800">{currentUser.login}</span> | Perfis & Segurança Ativos
+                            </div>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        function DashboardView({ currentUser, products, lotes, orders, cycles, activities, getProductStockSummary, setActiveTab }) {
+            // Calculated Metrics
+            const totalProducts = products.length;
+            let lowStockCount = 0;
+            let outOfStockCount = 0;
+            let expiredCount = 0;
+            let nearExpiryCount = 0;
+
+            Object.values(getProductStockSummary).forEach(s => {
+                if (s.status === 'ESTOQUE_BAIXO') lowStockCount++;
+                if (s.status === 'EM_FALTA') outOfStockCount++;
+                if (s.expiredCount > 0) expiredCount++;
+                if (s.nearExpiryCount > 0) nearExpiryCount++;
+            });
+
+            const pendingOrders = orders.filter(o => o.status === 'enviado' || o.status === 'em_analise').length;
+
+            return (
+                <div className="space-y-6">
+                    {/* Welcome Header Banner */}
+                    <div className="bg-gradient-to-r from-sky-700 to-sky-900 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row justify-between items-start md:items-center">
+                        <div>
+                            <div className="text-xs font-bold uppercase tracking-wider text-sky-200 mb-1">
+                                Painel Principal
+                            </div>
+                            <h2 className="text-2xl font-bold capitalize">olá, {currentUser.nome}</h2>
+                            <p className="text-sky-100 text-sm mt-1">{currentUser.descCargo}</p>
+                        </div>
+                        <div className="mt-4 md:mt-0 flex space-x-2">
+                            <span className="bg-sky-800/80 border border-sky-600 text-sky-100 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center">
+                                <i data-lucide="shield" className="w-4 h-4 mr-1.5 text-emerald-400"></i>
+                                Perfil: {currentUser.role}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* METRIC CARDS ROW */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow transition">
+                            <div className="flex items-center justify-between text-slate-500 mb-2">
+                                <span className="text-xs font-bold uppercase tracking-wider">Itens sem Estoque</span>
+                                <div className="p-2 bg-red-50 text-red-600 rounded-xl">
+                                    <i data-lucide="alert-octagon" className="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <div className="text-2xl font-black text-slate-900">{outOfStockCount}</div>
+                            <div className="text-xs text-red-600 font-medium mt-1">🔴 Requer atenção imediata</div>
+                        </div>
+
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow transition">
+                            <div className="flex items-center justify-between text-slate-500 mb-2">
+                                <span className="text-xs font-bold uppercase tracking-wider">Estoque Baixo</span>
+                                <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                                    <i data-lucide="alert-triangle" className="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <div className="text-2xl font-black text-slate-900">{lowStockCount}</div>
+                            <div className="text-xs text-amber-600 font-medium mt-1">🟠 Abaixo do estoque mínimo</div>
+                        </div>
+
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow transition">
+                            <div className="flex items-center justify-between text-slate-500 mb-2">
+                                <span className="text-xs font-bold uppercase tracking-wider">Próximos Vencimento</span>
+                                <div className="p-2 bg-yellow-50 text-yellow-600 rounded-xl">
+                                    <i data-lucide="clock" className="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <div className="text-2xl font-black text-slate-900">{nearExpiryCount}</div>
+                            <div className="text-xs text-yellow-700 font-medium mt-1">🟡 Vencimento &lt; 30 dias</div>
+                        </div>
+
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow transition">
+                            <div className="flex items-center justify-between text-slate-500 mb-2">
+                                <span className="text-xs font-bold uppercase tracking-wider">Pedidos Pendentes</span>
+                                <div className="p-2 bg-sky-50 text-sky-600 rounded-xl">
+                                    <i data-lucide="file-text" className="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <div className="text-2xl font-black text-slate-900">{pendingOrders}</div>
+                            <div className="text-xs text-sky-600 font-medium mt-1">Aguardando análise e envio</div>
+                        </div>
+                    </div>
+
+                    {/* ROLE-SPECIFIC QUICK ACTION DASHBOARD CARDS */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Critical Alerts & FEFO Prioritization */}
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider flex items-center">
+                                    <i data-lucide="bell" className="w-4 h-4 mr-2 text-sky-600"></i>
+                                    Alertas Críticos do Almoxarifado
+                                </h3>
+                                <button onClick={() => setActiveTab('estoque')} className="text-xs font-semibold text-sky-600 hover:underline">
+                                    Ver estoque completo &rarr;
+                                </button>
+                            </div>
+                            <div className="space-y-3">
+                                {products.map(p => {
+                                    const summary = getProductStockSummary[p.id];
+                                    if (summary.status === 'NORMAL' && summary.nearExpiryCount === 0 && summary.expiredCount === 0) return null;
+                                    return (
+                                        <div key={p.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200/60 text-xs">
+                                            <div>
+                                                <div className="font-bold text-slate-800">{p.nome}</div>
+                                                <div className="text-slate-500">Cód: {p.codigo} | Est. Mínimo: {p.estoqueMinimo}</div>
+                                            </div>
+                                            <div className="text-right">
+                                                {summary.status === 'EM_FALTA' && (
+                                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-800">🔴 Em falta</span>
+                                                )}
+                                                {summary.status === 'ESTOQUE_BAIXO' && (
+                                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">🟠 {summary.totalQtd} em estoque</span>
+                                                )}
+                                                {summary.nearExpiryCount > 0 && (
+                                                    <span className="ml-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-800">🟡 Vencimento Próximo</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Recent Activity Log Preview */}
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider flex items-center">
+                                    <i data-lucide="history" className="w-4 h-4 mr-2 text-sky-600"></i>
+                                    Atividades Recentes & Rastreabilidade
+                                </h3>
+                                <button onClick={() => setActiveTab('atividades')} className="text-xs font-semibold text-sky-600 hover:underline">
+                                    Ver auditoria &rarr;
+                                </button>
+                            </div>
+                            <div className="space-y-3">
+                                {activities.slice(0, 4).map(act => (
+                                    <div key={act.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-bold text-slate-800">{act.usuario} ({act.cargo})</span>
+                                            <span className="text-[10px] text-slate-400">{act.data}</span>
+                                        </div>
+                                        <div className="text-slate-600 mt-1 font-medium">{act.acao}</div>
+                                        <div className="text-[11px] text-slate-500 mt-0.5">
+                                            Produto: {act.produto} • Qtd: {act.quantidade} • {act.unidade}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function StockLotesView({ products, lotes, setLotes, getProductStockSummary, currentUser, logActivity, showToast }) {
+            const [searchTerm, setSearchTerm] = useState('');
+            const [selectedCategory, setSelectedCategory] = useState('TODOS');
+            const [filterStatus, setFilterStatus] = useState('TODOS');
+            const [showNewLoteModal, setShowNewLoteModal] = useState(false);
+
+            // New Lote Form State
+            const [newLoteProdId, setNewLoteProdId] = useState(products[0]?.id || '');
+            const [newLoteCodigo, setNewLoteCodigo] = useState('');
+            const [newLoteValidade, setNewLoteValidade] = useState('');
+            const [newLoteQtd, setNewLoteQtd] = useState('');
+            const [newLoteFornecedor, setNewLoteFornecedor] = useState('');
+
+            const filteredProducts = products.filter(p => {
+                const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase()) || p.codigo.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesCategory = selectedCategory === 'TODOS' || p.categoria === selectedCategory;
+                const summary = getProductStockSummary[p.id];
+                const matchesStatus = filterStatus === 'TODOS' || summary.status === filterStatus;
+
+                return matchesSearch && matchesCategory && matchesStatus;
+            });
+
+            const handleCreateLote = (e) => {
+                e.preventDefault();
+                if (!newLoteCodigo || !newLoteValidade || !newLoteQtd) {
+                    alert('Preencha todos os campos obrigatórios do lote.');
+                    return;
+                }
+
+                const newLoteObj = {
+                    id: 'l-' + Date.now(),
+                    produtoId: newLoteProdId,
+                    lote: newLoteCodigo,
+                    validade: newLoteValidade,
+                    quantidade: parseInt(newLoteQtd, 10),
+                    fornecedor: newLoteFornecedor || 'Fornecedor Cadastrado'
+                };
+
+                setLotes(prev => [...prev, newLoteObj]);
+                const p = products.find(prod => prod.id === newLoteProdId);
+                logActivity('Cadastro Direto de Lote de Estoque', p ? p.nome : 'Produto', newLoteQtd, 'Almoxarifado Central');
+                showToast(`Lote ${newLoteCodigo} adicionado com sucesso!`);
+
+                setShowNewLoteModal(false);
+                setNewLoteCodigo('');
+                setNewLoteValidade('');
+                setNewLoteQtd('');
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-900">Estoque Geral & Rastreabilidade de Lotes</h2>
+                            <p className="text-xs text-slate-500">Controle por princípio FEFO (First Expire, First Out) e validade.</p>
+                        </div>
+                        {(currentUser.role === 'ADMIN' || currentUser.role === 'COORDENADORA') && (
+                            <button
+                                onClick={() => setShowNewLoteModal(true)}
+                                className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-semibold text-xs shadow-sm transition flex items-center"
+                            >
+                                <i data-lucide="plus-circle" className="w-4 h-4 mr-2"></i>
+                                Cadastrar Novo Lote
+                            </button>
+                        )}
+                    </div>
+
+                    {/* FILTERS TOOLBAR */}
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row gap-3">
+                        <div className="flex-1 relative">
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Filtrar por nome ou código..."
+                                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            />
+                            <i data-lucide="search" className="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                        </div>
+
+                        <select
+                            value={selectedCategory}
+                            onChange={(e) => setSelectedCategory(e.target.value)}
+                            className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
+                        >
+                            <option value="TODOS">Todas as Categorias</option>
+                            {SEED_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+
+                        <select
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                            className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
+                        >
+                            <option value="TODOS">Todos os Status</option>
+                            <option value="NORMAL">Estoque Regular</option>
+                            <option value="ESTOQUE_BAIXO">Estoque Baixo 🟠</option>
+                            <option value="EM_FALTA">Em Falta 🔴</option>
+                        </select>
+                    </div>
+
+                    {/* PRODUCTS TABLE */}
+                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs text-slate-700">
+                                <thead className="bg-slate-50 border-b border-slate-200 font-bold uppercase tracking-wider text-slate-500">
+                                    <tr>
+                                        <th className="p-4">Código / Produto</th>
+                                        <th className="p-4">Categoria</th>
+                                        <th className="p-4">Localização</th>
+                                        <th className="p-4 text-center">Total Estoque</th>
+                                        <th className="p-4">Lotes Ativos (FEFO)</th>
+                                        <th className="p-4 text-right">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {filteredProducts.map(p => {
+                                        const summary = getProductStockSummary[p.id];
+                                        const pLotes = lotes
+                                            .filter(l => l.produtoId === p.id)
+                                            .sort((a, b) => new Date(a.validade) - new Date(b.validade));
+
+                                        return (
+                                            <tr key={p.id} className="hover:bg-slate-50/80 transition">
+                                                <td className="p-4">
+                                                    <div className="font-bold text-slate-900 text-sm">{p.nome}</div>
+                                                    <div className="text-slate-400 font-mono text-[11px]">Cód: {p.codigo} | {p.unidadeMedida}</div>
+                                                </td>
+                                                <td className="p-4 font-medium text-slate-600">{p.categoria}</td>
+                                                <td className="p-4 font-mono text-slate-500">{p.localizacao}</td>
+                                                <td className="p-4 text-center">
+                                                    <span className="font-black text-sm text-slate-900">{summary.totalQtd}</span>
+                                                    <span className="text-[10px] text-slate-400 block">Min: {p.estoqueMinimo}</span>
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="space-y-1">
+                                                        {pLotes.map((l, idx) => (
+                                                            <div key={l.id} className="flex items-center space-x-2 text-[11px]">
+                                                                <span className="font-mono font-bold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">{l.lote}</span>
+                                                                <span className="text-slate-600 font-semibold">{l.quantidade} un.</span>
+                                                                <span className={`text-[10px] px-1 rounded ${new Date(l.validade) < new Date() ? 'bg-red-100 text-red-800 font-bold' : 'text-slate-500'}`}>
+                                                                    Val: {new Date(l.validade).toLocaleDateString('pt-BR')}
+                                                                </span>
+                                                                {idx === 0 && pLotes.length > 1 && (
+                                                                    <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1 rounded">FEFO Próximo</span>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                                <td className="p-4 text-right">
+                                                    {summary.status === 'EM_FALTA' && (
+                                                        <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-800">🔴 Em Falta</span>
+                                                    )}
+                                                    {summary.status === 'ESTOQUE_BAIXO' && (
+                                                        <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">🟠 Estoque Baixo</span>
+                                                    )}
+                                                    {summary.status === 'NORMAL' && (
+                                                        <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">🟢 Regular</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* NEW LOTE MODAL */}
+                    {showNewLoteModal && (
+                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-slate-900 text-base">Cadastrar Novo Lote no Estoque</h3>
+                                    <button onClick={() => setShowNewLoteModal(false)} className="text-slate-400 hover:text-slate-600">
+                                        <i data-lucide="x" className="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                                <form onSubmit={handleCreateLote} className="space-y-4 text-xs">
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Produto</label>
+                                        <select
+                                            value={newLoteProdId}
+                                            onChange={(e) => setNewLoteProdId(e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                                        >
+                                            {products.map(p => <option key={p.id} value={p.id}>{p.nome} ({p.codigo})</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Código do Lote</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                placeholder="EX: LOTE-2026-X"
+                                                value={newLoteCodigo}
+                                                onChange={(e) => setNewLoteCodigo(e.target.value)}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Validade</label>
+                                            <input
+                                                type="date"
+                                                required
+                                                value={newLoteValidade}
+                                                onChange={(e) => setNewLoteValidade(e.target.value)}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Quantidade</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                required
+                                                placeholder="Ex: 500"
+                                                value={newLoteQtd}
+                                                onChange={(e) => setNewLoteQtd(e.target.value)}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Fornecedor</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Laboratório / Distribuidor"
+                                                value={newLoteFornecedor}
+                                                onChange={(e) => setNewLoteFornecedor(e.target.value)}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-4 flex justify-end space-x-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNewLoteModal(false)}
+                                            className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="px-4 py-2 bg-sky-600 text-white rounded-xl font-semibold hover:bg-sky-700"
+                                        >
+                                            Salvar Lote
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function InboundReceivingView({ products, lotes, setLotes, currentUser, logActivity, showToast }) {
+            const [selectedProdId, setSelectedProdId] = useState(products[0]?.id || '');
+            const [inputCodigo, setInputCodigo] = useState('');
+            const [inputLote, setInputLote] = useState('');
+            const [inputValidade, setInputValidade] = useState('');
+            const [inputQtd, setInputQtd] = useState('');
+            const [inputDoc, setInputDoc] = useState('');
+
+            // Pre-approved specifications simulation
+            const targetProd = products.find(p => p.id === selectedProdId);
+
+            // Compute Divergence
+            const hasDivergence = targetProd && inputCodigo && (inputCodigo !== targetProd.codigo);
+
+            const handleConfirmEntry = (e) => {
+                e.preventDefault();
+                if (hasDivergence) {
+                    alert('⚠️ Existem divergências no código do produto! O recebimento automático não é permitido sem justificativa.');
+                    return;
+                }
+
+                const newLoteObj = {
+                    id: 'l-in-' + Date.now(),
+                    produtoId: selectedProdId,
+                    lote: inputLote,
+                    validade: inputValidade,
+                    quantidade: parseInt(inputQtd, 10),
+                    fornecedor: `NF-e #${inputDoc || 'S/N'}`
+                };
+
+                setLotes(prev => [...prev, newLoteObj]);
+                logActivity(`Entrada Conferida via Nota Fiscal #${inputDoc}`, targetProd.nome, inputQtd, 'Almoxarifado Central');
+                showToast(`Entrada do produto ${targetProd.nome} registrada com sucesso!`);
+
+                setInputCodigo('');
+                setInputLote('');
+                setInputValidade('');
+                setInputQtd('');
+                setInputDoc('');
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900">Entrada de Materiais & Conferência de Divergências</h2>
+                        <p className="text-xs text-slate-500">Confronte os dados físicos da nota de entrega com o cadastro aprovado antes do aceite definitivo.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* FORM ENTRY INPUTS */}
+                        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                            <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider">Dados do Documento & Produto Entregue</h3>
+
+                            <form onSubmit={handleConfirmEntry} className="space-y-4 text-xs">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Selecione o Produto Pré-Aprovado</label>
+                                        <select
+                                            value={selectedProdId}
+                                            onChange={(e) => {
+                                                setSelectedProdId(e.target.value);
+                                                const p = products.find(prod => prod.id === e.target.value);
+                                                if (p) setInputCodigo(p.codigo);
+                                            }}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                                        >
+                                            {products.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Número da Nota Fiscal / Documento</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="Ex: NF-e 882910"
+                                            value={inputDoc}
+                                            onChange={(e) => setInputDoc(e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Código Informado na Caixa</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="Ex: MED-1001"
+                                            value={inputCodigo}
+                                            onChange={(e) => setInputCodigo(e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Lote Físico</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="Ex: LOTE-ABC-2026"
+                                            value={inputLote}
+                                            onChange={(e) => setInputLote(e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Data de Validade</label>
+                                        <input
+                                            type="date"
+                                            required
+                                            value={inputValidade}
+                                            onChange={(e) => setInputValidade(e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block font-bold text-slate-700 mb-1">Quantidade Recebida (Unidades Físicas)</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        required
+                                        placeholder="Ex: 1000"
+                                        value={inputQtd}
+                                        onChange={(e) => setInputQtd(e.target.value)}
+                                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-semibold"
+                                    />
+                                </div>
+
+                                <div className="pt-2">
+                                    <button
+                                        type="submit"
+                                        disabled={hasDivergence}
+                                        className={`w-full py-3 rounded-xl font-bold text-white transition flex justify-center items-center ${hasDivergence ? 'bg-slate-300 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 shadow-md'}`}
+                                    >
+                                        <i data-lucide="check-square" className="w-4 h-4 mr-2"></i>
+                                        Confirmar Entrada & Atualizar Estoque Oficial
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        {/* LIVE DIVERGENCE COMPARISON PANEL */}
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                            <div>
+                                <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wider mb-4">Painel de Conferência de Dados</h3>
+
+                                {targetProd && (
+                                    <div className="space-y-4 text-xs">
+                                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                            <div className="text-slate-400 font-bold uppercase text-[10px]">Dados Aprovados no Sistema</div>
+                                            <div className="font-bold text-slate-800 text-sm mt-1">{targetProd.nome}</div>
+                                            <div className="text-slate-600 font-mono mt-0.5">Código Oficial: {targetProd.codigo}</div>
+                                        </div>
+
+                                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                            <div className="text-slate-400 font-bold uppercase text-[10px]">Dados Informados do Recebimento</div>
+                                            <div className="font-mono font-bold text-slate-800 text-xs mt-1">
+                                                Código Informado: {inputCodigo || 'Não digitado'}
+                                            </div>
+                                        </div>
+
+                                        {hasDivergence ? (
+                                            <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-red-800 space-y-2">
+                                                <div className="flex items-center font-bold">
+                                                    <i data-lucide="alert-triangle" className="w-5 h-5 mr-2 text-red-600"></i>
+                                                    DIVERGÊNCIA DETECTADA!
+                                                </div>
+                                                <p className="text-[11px]">
+                                                    O código digitado (<span className="font-mono font-bold">{inputCodigo}</span>) difere do código aprovado (<span className="font-mono font-bold">{targetProd.codigo}</span>).
+                                                </p>
+                                                <div className="pt-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setInputCodigo(targetProd.codigo)}
+                                                        className="text-[10px] font-bold bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg text-red-900 transition"
+                                                    >
+                                                        Corrigir código para o aprovado
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-800 flex items-center">
+                                                <i data-lucide="check-circle-2" className="w-5 h-5 mr-2 text-emerald-600"></i>
+                                                <span className="font-bold text-xs">Conferência Aprovada — Dados compatíveis.</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function OrdersAnalysisView({ orders, setOrders, products, lotes, getProductStockSummary, currentUser, setSelectedOrderForPrint, logActivity, showToast }) {
+            const [selectedOrder, setSelectedOrder] = useState(orders[0] || null);
+
+            const handleAnalyzeItem = (orderId, prodId, aprovadoVal, negadoVal, motivoVal) => {
+                setOrders(prev => prev.map(o => {
+                    if (o.id !== orderId) return o;
+                    const updatedItens = o.itens.map(it => {
+                        if (it.produtoId !== prodId) return it;
+                        return {
+                            ...it,
+                            aprovado: parseInt(aprovadoVal, 10),
+                            negado: parseInt(negadoVal, 10),
+                            motivo: motivoVal
+                        };
+                    });
+                    return { ...o, itens: updatedItens, status: 'em_analise' };
+                }));
+                showToast('Item atualizado no pedido.');
+            };
+
+            const handleFinalizeAnalysis = (orderId) => {
+                setOrders(prev => prev.map(o => {
+                    if (o.id !== orderId) return o;
+                    return { ...o, status: 'pronto_separacao' };
+                }));
+                const ord = orders.find(o => o.id === orderId);
+                logActivity(`Análise de Pedido Concluída (${ord ? ord.unidadeNome : ''})`, 'Múltiplos Itens', 0, ord ? ord.unidadeNome : '');
+                showToast('Pedido analisado e liberado para separação física!');
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900">Análise Item por Item dos Pedidos das Unidades</h2>
+                        <p className="text-xs text-slate-500">Verifique o estoque disponível e aprove/ajuste as quantidades solicitadas.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* ORDERS LIST COLUMN */}
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+                            <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider mb-2">Pedidos Recebidos</h3>
+                            {orders.map(o => (
+                                <div
+                                    key={o.id}
+                                    onClick={() => setSelectedOrder(o)}
+                                    className={`p-3.5 rounded-xl border cursor-pointer transition text-xs ${selectedOrder?.id === o.id ? 'border-sky-500 bg-sky-50/50 shadow-sm' : 'border-slate-200 hover:bg-slate-50'}`}
+                                >
+                                    <div className="flex justify-between items-center font-bold">
+                                        <span className="text-slate-900">{o.unidadeNome}</span>
+                                        <span className="font-mono text-slate-500 text-[10px]">{o.id}</span>
+                                    </div>
+                                    <div className="text-slate-500 mt-1">Solicitante: {o.solicitante}</div>
+                                    <div className="flex justify-between items-center mt-2">
+                                        <span className="text-[10px] text-slate-400">{new Date(o.dataCriacao).toLocaleDateString('pt-BR')}</span>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                            o.status === 'pronto_separacao' ? 'bg-emerald-100 text-emerald-800' :
+                                            o.status === 'em_analise' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+                                        }`}>
+                                            {o.status === 'pronto_separacao' ? 'Pronto Separação' : o.status === 'em_analise' ? 'Em Análise' : 'Enviado'}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* ORDER ITEM-BY-ITEM DETAILED ANALYSIS PANEL */}
+                        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+                            {selectedOrder ? (
+                                <div className="space-y-6">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-200 pb-4">
+                                        <div>
+                                            <span className="text-xs font-bold text-sky-600 uppercase tracking-wider">Pedido #{selectedOrder.id}</span>
+                                            <h3 className="text-lg font-bold text-slate-900">{selectedOrder.unidadeNome}</h3>
+                                            <p className="text-xs text-slate-500">Observação da Unidade: {selectedOrder.observacao}</p>
+                                        </div>
+                                        <div className="mt-2 sm:mt-0 flex space-x-2">
+                                            {selectedOrder.status === 'pronto_separacao' && (
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedOrderForPrint(selectedOrder);
+                                                        setTimeout(() => window.print(), 300);
+                                                    }}
+                                                    className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-semibold shadow-sm transition flex items-center"
+                                                >
+                                                    <i data-lucide="printer" className="w-4 h-4 mr-2"></i>
+                                                    Imprimir Pedido A4
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* ITEMS TABLE */}
+                                    <div className="space-y-4">
+                                        {selectedOrder.itens.map(it => {
+                                            const p = products.find(prod => prod.id === it.produtoId);
+                                            const summary = p ? getProductStockSummary[p.id] : { totalQtd: 0 };
+                                            const approvedVal = it.aprovado !== null ? it.aprovado : it.solicitado;
+                                            const deniedVal = it.negado !== null ? it.negado : 0;
+
+                                            return (
+                                                <div key={it.produtoId} className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-3">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <span className="font-bold text-slate-900 text-sm">{it.produtoNome}</span>
+                                                            <div className="text-slate-500 mt-0.5">
+                                                                Solicitado: <span className="font-bold text-slate-800">{it.solicitado} un.</span> |
+                                                                Estoque Disponível Central: <span className={`font-bold ${summary.totalQtd < it.solicitado ? 'text-amber-600' : 'text-emerald-600'}`}>{summary.totalQtd} un.</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-200/60">
+                                                        <div>
+                                                            <label className="block text-[10px] font-bold text-slate-600 uppercase">Qtd. a Enviar</label>
+                                                            <input
+                                                                type="number"
+                                                                value={approvedVal}
+                                                                onChange={(e) => {
+                                                                    const val = parseInt(e.target.value, 10) || 0;
+                                                                    const denied = Math.max(0, it.solicitado - val);
+                                                                    handleAnalyzeItem(selectedOrder.id, it.produtoId, val, denied, it.motivo);
+                                                                }}
+                                                                className="w-full mt-1 p-2 bg-white border border-slate-300 rounded-lg font-bold text-slate-800"
+                                                            />
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="block text-[10px] font-bold text-slate-600 uppercase">Qtd. Não Enviada</label>
+                                                            <input
+                                                                type="number"
+                                                                readOnly
+                                                                value={deniedVal}
+                                                                className="w-full mt-1 p-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-medium"
+                                                            />
+                                                        </div>
+
+                                                        <div>
+                                                            <label className="block text-[10px] font-bold text-slate-600 uppercase">Motivo / Observação</label>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Ex: Estoque insuficiente"
+                                                                value={it.motivo || ''}
+                                                                onChange={(e) => handleAnalyzeItem(selectedOrder.id, it.produtoId, approvedVal, deniedVal, e.target.value)}
+                                                                className="w-full mt-1 p-2 bg-white border border-slate-300 rounded-lg text-slate-800"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {selectedOrder.status !== 'pronto_separacao' && (
+                                        <div className="pt-4 flex justify-end">
+                                            <button
+                                                onClick={() => handleFinalizeAnalysis(selectedOrder.id)}
+                                                className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center"
+                                            >
+                                                <i data-lucide="check" className="w-4 h-4 mr-2"></i>
+                                                Finalizar Análise & Enviar para Separação Física
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-center py-12 text-slate-400">
+                                    <i data-lucide="inbox" className="w-12 h-12 mx-auto mb-2 opacity-50"></i>
+                                    <p className="text-xs">Selecione um pedido ao lado para iniciar a análise.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function InventoryCyclesView({ cycles, setCycles, products, lotes, setLotes, currentUser, directUpdateAllowed, setDirectUpdateAllowed, logActivity, showToast }) {
+            const [selectedCycle, setSelectedCycle] = useState(cycles[0] || null);
+
+            const handleApproveCycleDivergence = (cycleId) => {
+                // Apply differences to stock
+                const targetCyc = cycles.find(c => c.id === cycleId);
+                if (!targetCyc) return;
+
+                targetCyc.itens.forEach(item => {
+                    const targetLote = lotes.find(l => l.produtoId === item.produtoId && l.lote === item.lote);
+                    if (targetLote) {
+                        setLotes(prev => prev.map(l => l.id === targetLote.id ? { ...l, quantidade: item.qtdEncontrada } : l));
+                    }
+                });
+
+                setCycles(prev => prev.map(c => c.id === cycleId ? { ...c, status: 'CONCLUIDO' } : c));
+                logActivity(`Aprovação de Ajuste Inventário Ciclo ${cycleId}`, 'Múltiplos Produtos', 0, 'Almoxarifado Central');
+                showToast(`Atualização do ciclo ${cycleId} aprovada e estoque oficial ajustado!`);
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-900">Atualização do Almoxarifado (Ciclos de Contagem Física)</h2>
+                            <p className="text-xs text-slate-500">Conferência periódica de estoque e aprovação de divergências pela coordenação.</p>
+                        </div>
+
+                        {/* Direct Update Permission Switch for Coordinator */}
+                        {(currentUser.role === 'ADMIN' || currentUser.role === 'COORDENADORA') && (
+                            <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-sm flex items-center space-x-3 text-xs">
+                                <span className="font-bold text-slate-700">Alteração Direta pela Organização:</span>
+                                <button
+                                    onClick={() => {
+                                        setDirectUpdateAllowed(!directUpdateAllowed);
+                                        showToast(`Permissão de alteração direta alterada para: ${!directUpdateAllowed ? 'PERMITIDO' : 'BLOQUEADO'}`);
+                                    }}
+                                    className={`px-3 py-1 rounded-lg font-bold text-[10px] transition ${
+                                        directUpdateAllowed ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-red-100 text-red-800 border border-red-300'
+                                    }`}
+                                >
+                                    {directUpdateAllowed ? 'PERMITIDO' : 'BLOQUEADO (Requer Aprovação)'}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* CYCLES LIST */}
+                        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+                            <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider mb-2">Ciclos de Atualização</h3>
+                            {cycles.map(c => (
+                                <div
+                                    key={c.id}
+                                    onClick={() => setSelectedCycle(c)}
+                                    className={`p-3.5 rounded-xl border cursor-pointer transition text-xs ${selectedCycle?.id === c.id ? 'border-sky-500 bg-sky-50/50 shadow-sm' : 'border-slate-200 hover:bg-slate-50'}`}
+                                >
+                                    <div className="flex justify-between items-center font-bold">
+                                        <span className="text-slate-900">{c.titulo}</span>
+                                    </div>
+                                    <div className="text-slate-500 mt-1">Responsável: {c.responsavel}</div>
+                                    <div className="flex justify-between items-center mt-2">
+                                        <span className="text-[10px] text-slate-400">Limite: {c.dataLimite}</span>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                            c.status === 'CONCLUIDO' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                        }`}>
+                                            {c.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* CYCLE DETAILS AND DIVERGENCES */}
+                        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+                            {selectedCycle ? (
+                                <div className="space-y-6 text-xs">
+                                    <div className="flex justify-between items-start border-b border-slate-200 pb-4">
+                                        <div>
+                                            <span className="font-bold text-sky-600 uppercase tracking-wider text-[10px]">Ciclo #{selectedCycle.id}</span>
+                                            <h3 className="text-base font-bold text-slate-900">{selectedCycle.titulo}</h3>
+                                            <p className="text-slate-500 mt-0.5">{selectedCycle.observacao}</p>
+                                        </div>
+                                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                                            Status: {selectedCycle.status}
+                                        </span>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <h4 className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">Itens Conferidos na Prateleira</h4>
+                                        {selectedCycle.itens.map((it, idx) => (
+                                            <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                                                <div className="flex justify-between items-center font-bold">
+                                                    <span className="text-slate-900">{it.produtoNome} (Lote: {it.lote})</span>
+                                                    <span className={it.diferenca < 0 ? 'text-red-600 font-bold' : 'text-emerald-600 font-bold'}>
+                                                        Diferença: {it.diferenca} un.
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-600">
+                                                    <div>Qtd. Sistema: <span className="font-bold">{it.qtdSistema}</span></div>
+                                                    <div>Qtd. Encontrada: <span className="font-bold text-slate-900">{it.qtdEncontrada}</span></div>
+                                                    <div>Validade: <span>{it.validade}</span></div>
+                                                </div>
+                                                {it.obs && <div className="text-[10px] text-slate-500 italic bg-white p-2 rounded border border-slate-200">Obs: {it.obs}</div>}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {selectedCycle.status !== 'CONCLUIDO' && (currentUser.role === 'ADMIN' || currentUser.role === 'COORDENADORA') && (
+                                        <div className="pt-4 border-t border-slate-200 flex justify-end">
+                                            <button
+                                                onClick={() => handleApproveCycleDivergence(selectedCycle.id)}
+                                                className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center"
+                                            >
+                                                <i data-lucide="check-circle" className="w-4 h-4 mr-2"></i>
+                                                Aprovar Relatório de Contagem e Ajustar Estoque Oficial
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-center py-12 text-slate-400">
+                                    <i data-lucide="clipboard" className="w-12 h-12 mx-auto mb-2 opacity-50"></i>
+                                    <p className="text-xs">Selecione um ciclo de atualização para conferir os dados.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function DonationsView({ donations, setDonations, products, lotes, setLotes, currentUser, logActivity, showToast }) {
+            const [showModal, setShowModal] = useState(false);
+            const [tipo, setTipo] = useState('RECEBIDA');
+            const [prodNome, setProdNome] = useState('');
+            const [qtd, setQtd] = useState('');
+            const [lote, setLote] = useState('');
+            const [validade, setValidade] = useState('');
+            const [origemDestino, setOrigemDestino] = useState('');
+            const [doc, setDoc] = useState('');
+
+            const handleSaveDonation = (e) => {
+                e.preventDefault();
+                const newDon = {
+                    id: 'don-' + Date.now(),
+                    tipo,
+                    produtoNome: prodNome,
+                    quantidade: parseInt(qtd, 10),
+                    lote,
+                    validade,
+                    origemDestino,
+                    data: new Date().toISOString().split('T')[0],
+                    documento: doc,
+                    responsavel: currentUser.login
+                };
+
+                setDonations(prev => [newDon, ...prev]);
+                logActivity(`Registro de Doação (${tipo})`, prodNome, qtd, origemDestino);
+                showToast('Doação registrada com sucesso no histórico oficial.');
+
+                setShowModal(false);
+                setProdNome('');
+                setQtd('');
+                setLote('');
+                setValidade('');
+                setOrigemDestino('');
+                setDoc('');
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-900">Gestão de Doações Recebidas e Realizadas</h2>
+                            <p className="text-xs text-slate-500">Rastreabilidade completa e emissão de comprovantes de doação pública.</p>
+                        </div>
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-semibold text-xs shadow-sm transition flex items-center"
+                        >
+                            <i data-lucide="plus-circle" className="w-4 h-4 mr-2"></i>
+                            Registrar Nova Doação
+                        </button>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                        <table className="w-full text-left text-xs text-slate-700">
+                            <thead className="bg-slate-50 border-b border-slate-200 font-bold uppercase tracking-wider text-slate-500">
+                                <tr>
+                                    <th className="p-4">Tipo</th>
+                                    <th className="p-4">Produto</th>
+                                    <th className="p-4">Qtd / Lote</th>
+                                    <th className="p-4">Origem / Destino</th>
+                                    <th className="p-4">Documento / Data</th>
+                                    <th className="p-4 text-right">Responsável</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {donations.map(d => (
+                                    <tr key={d.id} className="hover:bg-slate-50 transition">
+                                        <td className="p-4">
+                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                                d.tipo === 'RECEBIDA' ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
+                                            }`}>
+                                                {d.tipo}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 font-bold text-slate-900">{d.produtoNome}</td>
+                                        <td className="p-4 font-semibold text-slate-800">
+                                            {d.quantidade} un.
+                                            <span className="block text-[10px] text-slate-400 font-mono">Lote: {d.lote}</span>
+                                        </td>
+                                        <td className="p-4 text-slate-600 font-medium">{d.origemDestino}</td>
+                                        <td className="p-4 text-slate-500">
+                                            <div>{d.documento}</div>
+                                            <div className="text-[10px] text-slate-400">{d.data}</div>
+                                        </td>
+                                        <td className="p-4 text-right font-mono text-slate-600">{d.responsavel}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* MODAL NEW DONATION */}
+                    {showModal && (
+                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-slate-900 text-base">Registrar Nova Doação</h3>
+                                    <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+                                        <i data-lucide="x" className="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                                <form onSubmit={handleSaveDonation} className="space-y-4 text-xs">
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Tipo de Doação</label>
+                                        <select
+                                            value={tipo}
+                                            onChange={(e) => setTipo(e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                                        >
+                                            <option value="RECEBIDA">RECEBIDA (Entrada de Material)</option>
+                                            <option value="REALIZADA">REALIZADA (Saída para Terceiros/Entidades)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Nome do Produto</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="Ex: Luva de Procedimento"
+                                            value={prodNome}
+                                            onChange={(e) => setProdNome(e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Quantidade</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                required
+                                                value={qtd}
+                                                onChange={(e) => setQtd(e.target.value)}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Lote</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                placeholder="LOTE-123"
+                                                value={lote}
+                                                onChange={(e) => setLote(e.target.value)}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Validade</label>
+                                            <input
+                                                type="date"
+                                                required
+                                                value={validade}
+                                                onChange={(e) => setValidade(e.target.value)}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Documento / Ofício</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Ofício 100/2026"
+                                                value={doc}
+                                                onChange={(e) => setDoc(e.target.value)}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Origem ou Destino</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="Ex: Entidade Doadora / Instituição Recebedora"
+                                            value={origemDestino}
+                                            onChange={(e) => setOrigemDestino(e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                                        />
+                                    </div>
+
+                                    <div className="pt-4 flex justify-end space-x-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowModal(false)}
+                                            className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="px-4 py-2 bg-sky-600 text-white rounded-xl font-semibold hover:bg-sky-700"
+                                        >
+                                            Salvar Doação
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function ActivityLogView({ activities }) {
+            return (
+                <div className="space-y-6">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900">Central de Atividades & Trilha Imutável de Auditoria</h2>
+                        <p className="text-xs text-slate-500">Registro histórico de todas as alterações críticas realizadas pelos usuários do sistema.</p>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                        <table className="w-full text-left text-xs text-slate-700">
+                            <thead className="bg-slate-50 border-b border-slate-200 font-bold uppercase tracking-wider text-slate-500">
+                                <tr>
+                                    <th className="p-4">Usuário / Cargo</th>
+                                    <th className="p-4">Ação Executada</th>
+                                    <th className="p-4">Produto Envolvido</th>
+                                    <th className="p-4">Quantidade</th>
+                                    <th className="p-4">Unidade / Local</th>
+                                    <th className="p-4">Data e Horário</th>
+                                    <th className="p-4 text-right">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 font-medium">
+                                {activities.map(act => (
+                                    <tr key={act.id} className="hover:bg-slate-50 transition">
+                                        <td className="p-4">
+                                            <span className="font-bold text-slate-900 capitalize block">{act.usuario}</span>
+                                            <span className="text-[10px] text-slate-400 capitalize">{act.cargo}</span>
+                                        </td>
+                                        <td className="p-4 text-slate-800 font-semibold">{act.acao}</td>
+                                        <td className="p-4 text-slate-600">{act.produto}</td>
+                                        <td className="p-4 font-bold text-slate-900">{act.quantidade > 0 ? `${act.quantidade} un.` : '-'}</td>
+                                        <td className="p-4 text-slate-500">{act.unidade}</td>
+                                        <td className="p-4 font-mono text-[11px] text-slate-500">{act.data}</td>
+                                        <td className="p-4 text-right">
+                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                                {act.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        function UserManagementView({ users, setUsers, showToast }) {
+            const [showModal, setShowModal] = useState(false);
+            const [nome, setNome] = useState('');
+            const [cargo, setCargo] = useState('coordenadora');
+            const [descCargo, setDescCargo] = useState('');
+            const [role, setRole] = useState('COORDENADORA');
+
+            const handleCreateUser = (e) => {
+                e.preventDefault();
+                const cleanNome = nome.trim().toLowerCase();
+                const cleanCargo = cargo.trim().toLowerCase();
+                const generatedLogin = `${cleanNome}.${cleanCargo}`;
+
+                if (users.some(u => u.login === generatedLogin)) {
+                    alert('Este login (nome.cargo) já existe no sistema.');
+                    return;
+                }
+
+                const newUser = {
+                    id: 'u-' + Date.now(),
+                    login: generatedLogin,
+                    nome: cleanNome,
+                    cargo: cleanCargo,
+                    descCargo: descCargo || 'Funcionária Pública',
+                    role,
+                    senhaHash: 'demo123',
+                    status: 'Ativo'
+                };
+
+                setUsers(prev => [...prev, newUser]);
+                showToast(`Usuário ${generatedLogin} cadastrado com sucesso!`);
+
+                setShowModal(false);
+                setNome('');
+                setCargo('coordenadora');
+                setDescCargo('');
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h2 className="text-xl font-bold text-slate-900">Gestão de Usuários & Permissões</h2>
+                            <p className="text-xs text-slate-500">Controle de acessos individuais no formato padrão obrigatorio nome.cargo.</p>
+                        </div>
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-semibold text-xs shadow-sm transition flex items-center"
+                        >
+                            <i data-lucide="user-plus" className="w-4 h-4 mr-2"></i>
+                            Cadastrar Novo Usuário
+                        </button>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+                        <table className="w-full text-left text-xs text-slate-700">
+                            <thead className="bg-slate-50 border-b border-slate-200 font-bold uppercase tracking-wider text-slate-500">
+                                <tr>
+                                    <th className="p-4">Login (nome.cargo)</th>
+                                    <th className="p-4">Nome</th>
+                                    <th className="p-4">Cargo / Função</th>
+                                    <th className="p-4">Perfil / Role</th>
+                                    <th className="p-4 text-right">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {users.map(u => (
+                                    <tr key={u.id} className="hover:bg-slate-50 transition">
+                                        <td className="p-4 font-mono font-bold text-sky-700">{u.login}</td>
+                                        <td className="p-4 capitalize font-semibold text-slate-900">{u.nome}</td>
+                                        <td className="p-4 text-slate-600">{u.descCargo}</td>
+                                        <td className="p-4">
+                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                                                {u.role}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                                {u.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* NEW USER MODAL */}
+                    {showModal && (
+                        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-slate-900 text-base">Cadastrar Novo Usuário</h3>
+                                    <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+                                        <i data-lucide="x" className="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                                <form onSubmit={handleCreateUser} className="space-y-4 text-xs">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Nome (apenas primeiro nome)</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                placeholder="ex: juliana"
+                                                value={nome}
+                                                onChange={(e) => setNome(e.target.value)}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-bold text-slate-700 mb-1">Cargo (Sufixo do Login)</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                placeholder="ex: coordenadora"
+                                                value={cargo}
+                                                onChange={(e) => setCargo(e.target.value)}
+                                                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Preview do Login Gerado</label>
+                                        <div className="p-2.5 bg-slate-100 rounded-xl font-mono font-bold text-sky-700 text-sm">
+                                            {nome.trim().toLowerCase() || 'nome'}.{cargo.trim().toLowerCase() || 'cargo'}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Descrição Exibida do Cargo</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="Ex: Coordenadora do Almoxarifado"
+                                            value={descCargo}
+                                            onChange={(e) => setDescCargo(e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-bold text-slate-700 mb-1">Perfil de Permissões (Role)</label>
+                                        <select
+                                            value={role}
+                                            onChange={(e) => setRole(e.target.value)}
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold"
+                                        >
+                                            <option value="ADMIN">ADMINISTRADOR</option>
+                                            <option value="COORDENADORA">COORDENADORA DO ALMOXARIFADO</option>
+                                            <option value="ORGANIZACAO">RESPONSÁVEL PELA ORGANIZAÇÃO</option>
+                                            <option value="ANALISTA_PEDIDOS">RESPONSÁVEL PELA ANÁLISE DE PEDIDOS</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="pt-4 flex justify-end space-x-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowModal(false)}
+                                            className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="px-4 py-2 bg-sky-600 text-white rounded-xl font-semibold hover:bg-sky-700"
+                                        >
+                                            Cadastrar Usuário
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function PrintableOrderSlip({ order }) {
+            return (
+                <div className="print-only p-8 bg-white text-black font-sans text-xs">
+                    <div className="text-center border-b-2 border-black pb-4 mb-6">
+                        <h1 className="text-xl font-bold uppercase">PREFEITURA MUNICIPAL</h1>
+                        <h2 className="text-base font-bold uppercase">SECRETARIA MUNICIPAL DE SAÚDE</h2>
+                        <h3 className="text-sm font-semibold uppercase">ALMOXARIFADO CENTRAL DA SAÚDE</h3>
+                        <p className="text-xs font-mono mt-1">ORDEM DE SEPARAÇÃO FÍSICA E EXPEDIÇÃO DE MATERIAIS</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 border border-black p-4 mb-6">
+                        <div>
+                            <div><strong>NÚMERO DO PEDIDO:</strong> {order.id}</div>
+                            <div><strong>UNIDADE SOLICITANTE:</strong> {order.unidadeNome}</div>
+                            <div><strong>SOLICITANTE:</strong> {order.solicitante}</div>
+                        </div>
+                        <div>
+                            <div><strong>DATA DO PEDIDO:</strong> {new Date(order.dataCriacao).toLocaleDateString('pt-BR')}</div>
+                            <div><strong>STATUS:</strong> APROVADO PARA SEPARAÇÃO</div>
+                            <div><strong>OBSERVAÇÃO:</strong> {order.observacao || 'Nenhum'}</div>
+                        </div>
+                    </div>
+
+                    <table className="w-full border-collapse border border-black mb-8 text-xs">
+                        <thead>
+                            <tr className="bg-slate-200">
+                                <th className="border border-black p-2 text-left">PRODUTO / DESCRIÇÃO</th>
+                                <th className="border border-black p-2 text-center">SOLICITADO</th>
+                                <th className="border border-black p-2 text-center">APROVADO</th>
+                                <th className="border border-black p-2 text-center">QTD. SEPARADA</th>
+                                <th className="border border-black p-2 text-left">OBSERVAÇÕES / LOTE SEPARADO</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {order.itens.map(it => (
+                                <tr key={it.produtoId}>
+                                    <td className="border border-black p-2 font-bold">{it.produtoNome}</td>
+                                    <td className="border border-black p-2 text-center">{it.solicitado}</td>
+                                    <td className="border border-black p-2 text-center font-bold">{it.aprovado !== null ? it.aprovado : it.solicitado}</td>
+                                    <td className="border border-black p-2 text-center">[ &nbsp; &nbsp; &nbsp; &nbsp; ]</td>
+                                    <td className="border border-black p-2 text-slate-500">{it.motivo || ''}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    <div className="grid grid-cols-2 gap-8 pt-12 border-t border-black">
+                        <div className="text-center">
+                            <div className="border-t border-black w-48 mx-auto mb-1"></div>
+                            <div><strong>RESPONSÁVEL PELA SEPARAÇÃO</strong></div>
+                            <div className="text-[10px] text-slate-500">Almoxarifado Central</div>
+                        </div>
+
+                        <div className="text-center">
+                            <div className="border-t border-black w-48 mx-auto mb-1"></div>
+                            <div><strong>RESPONSÁVEL PELO RECEBIMENTO</strong></div>
+                            <div className="text-[10px] text-slate-500">{order.unidadeNome}</div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
